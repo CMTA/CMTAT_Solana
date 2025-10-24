@@ -22,18 +22,18 @@ This program defines a common implementation for Fungible and Non Fungible token
 
 #### Features
 
-- **Create a Token Mint** – Initialize a new SPL Token mint.
-- **Create a Token Account** – Open an account to hold SPL tokens.
-- **Mint Tokens** – Generate new units of the token and assign them to an account.
-- **Transfer Tokens** – Send tokens between accounts securely.
-- **Approve Delegate** – Grant another account permission to manage tokens on behalf of the owner.
-- **Revoke Delegate** – Remove delegate permissions from an account.
-- **Set Authority** – Change the authority for a mint or token account (e.g., minting, freezing, account management).
-- **Burn Tokens** – Permanently destroy tokens, reducing supply.
-- **Sync Native** – Wrap native SOL into wrapped SOL (WSOL) for token program compatibility.
-- **Close Token Account** – Close an SPL Token account and reclaim its SOL rent.
-- **Freeze Account** – Halt activity on a token account.
-- **Thaw Account** – Reactivate a previously frozen token account.
+- Create a Token Mint – Initialize a new SPL Token mint.
+- Create a Token Account – Open an account to hold SPL tokens.
+- Mint Tokens – Generate new units of the token and assign them to an account.
+- Transfer Tokens – Send tokens between accounts securely.
+- Approve Delegate – Grant another account permission to manage tokens on behalf of the owner.
+- Revoke Delegate – Remove delegate permissions from an account.
+- Set Authority – Change the authority for a mint or token account (e.g., minting, freezing, account management).
+- Burn Tokens – Permanently destroy tokens, reducing supply.
+- Sync Native – Wrap native SOL into wrapped SOL (WSOL) for token program compatibility.
+- Close Token Account – Close an SPL Token account and reclaim its SOL rent.
+- Freeze Account – Halt activity on a token account.
+- Thaw Account – Reactivate a previously frozen token account.
 
 ### Solana Extension (Token-2022)
 
