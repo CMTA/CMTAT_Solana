@@ -9,6 +9,10 @@ Tokens on Solana are digital assets that represent ownership over diverse catego
 
 Tokens on Solana are referred to as SPL ([Solana Program Library](https://github.com/solana-program)) Tokens.
 
+[TOC]
+
+
+
 ### Solana Token
 
 This program defines a common implementation for Fungible and Non Fungible tokens.
@@ -142,6 +146,58 @@ This section contains three tab to indicate if a Solana token features or an ext
 | Upgradibility               | &#x2612;                | No relevant                                                  | No relevant                                                  | -                                                            |
 | Feepayer/gasless            | &#x2612;                | &#x2612;                                                     | &#x2612;                                                     | [Sponsoring Solana transactions - Coinbase Developer Documentation](https://docs.cdp.coinbase.com/server-wallets/v2/solana-features/sponsor-transactions) (managed at the transaction level, no link with the token |
 
+
+
+## Schema
+
+### Features
+
+![solana-cmtat-extension-list-color.drawio](./schema/solana-cmtat-extension-list-color.drawio.png)
+
+#### Base
+
+![solana-cmtat-basic.drawio](./schema/solana-cmtat-basic.drawio.png)
+
+#### Extensions
+
+![solana-cmtat-extension.drawio](./schema/solana-cmtat-extension.drawio.png)
+
+### Access Control
+
+Here is a schema representing the different authorities:
+
+![solana-cmtat.drawio](./schema/solana-cmtat.drawio.png) 
+
+## 
+
+## Main difference with EVM Solidity version
+
+**burn / transfer**
+
+- With Solana, there is no difference between a regular transfer and a forced transfer, while on Ethereum it is two distinct functions. Same applies to a force burn.
+  - Nevertheless, the signer of the transaction will be different if it is a forced transfer (delegate authority) or a regular transfer (token holder signer).
+- Forced transfer is an optional feature of CMTAT. While the EVM version allows to only include the force burn, with Solana, it is not possible to include the force burn without the force transfer.
+
+Note: It is possible to separate force burn from force transfer if the permanent delegate is itself a smart contract that would only allow for one of the two options. 
+
+- Contrary to the Solidity version, token holder can burn their own tokens.
+
+**Access control**
+
+- With the Solidity version, you can have a super admin which delegates several tasks to different addresses through different roles, for example the minter role to mint tokens.
+- With Solana, you can also delegate roles, but it is not possible to delegate them while keeping a super admin.
+
+Note: Similar to forced transfer above, if the role authorities are themselves smart contracts you can create complex control structures with multisigs, admin accounts etc. In order to have a super admin, you can designate all roles to one smart contract which then has its own rules as to who has authority over which role.
+
+**Mint/burn while pause**
+
+- With Ethereum, you can still burn and mint tokens while pausing regular transfers.
+- This is not the case with Solana where the pause will also apply to mint and burn operations in addition to regular transfers.
+
+Note: In order to enable this, you can use a [transfer hook](https://www.solana-program.com/docs/token-2022/extensions#transfer-hook) that is set to a program that just fails every transfer. This way you retain all other administrative features but prevent anyone from transferring tokens.
+
+## 
+
 ## CMTAT Deployment Guide (Token-2022)
 
 This guide includes the deployment of a token on Solana which respects the CMTAT specification and contains the following features
@@ -150,10 +206,12 @@ This guide includes the deployment of a token on Solana which respects the CMTAT
 - Freeze/unfreeze accounts
 - Burn and forced transfer (Permanent Delegate)
 - Pause/resume token activity
-- On-chain metadata with custom fields (`termsHash`, jurisdiction, issuer)
+- Token information
+  - Token name and Symbol
+  - On-chain metadata with custom fields (`termsHash`, jurisdiction, issuer)
+
 - Deactivate the token
   - close mint
-- Name and Symbol
 
 All the operations have been made on a Linux machine through the SPL command line on a local Solana blockchain
 
@@ -163,13 +221,23 @@ All the operations have been made on a Linux machine through the SPL command lin
 
 To simplify command, different values are stored in the current bash session environment.
 
-| **Variable**        | **Value**                                            |
-| :------------------ | :--------------------------------------------------- |
-| SOLANA_KEYPAIR      | Path to the JSON file containing the admin keypair   |
-| USER_SOLANA_KEYPAIR | Path to the JSON file containing the user keypair    |
-| TOKEN_MINT          | Token address                                        |
-| TOKEN_ACCOUNT       | Admin Token account for the corresponding TOKEN_MINT |
-| USER_TOKEN_ACCOUNT  | User Token account for the corresponding TOKEN_MINT  |
+| **Variable**         | Description                                          | Value                                                        |
+| :------------------- | :--------------------------------------------------- | ------------------------------------------------------------ |
+| ADMIN_SOLANA_KEYPAIR | Path to the JSON file containing the admin keypair   | Public Address<br />`Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj` |
+| USER_SOLANA_KEYPAIR  | Path to the JSON file containing the user keypair    | Public address<br />`9Grr8jKaZUji1VGj3uBBE3vWBmRbf48CGUchAUfxrqk` |
+| TOKEN_MINT           | Token address                                        | `JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2`               |
+| ADMIN_TOKEN_ACCOUNT  | Admin Token account for the corresponding TOKEN_MINT | `ApXcDVWCXhPgfAmUYqQ85JcYmyxqecqDPKXPz8B2fjqK`               |
+| USER_TOKEN_ACCOUNT   | User Token account for the corresponding TOKEN_MINT  | `diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1`                |
+
+#### Run a local blockchain
+
+```bash
+solana-test-validator
+```
+
+
+
+![1. solana-validator](./assets/1. solana-validator.png)
 
 #### Generate Admin Keypair
 
@@ -182,14 +250,30 @@ This keypair will act as the mint authority, freeze authority, pause authority, 
 # Generate a new Solana keypair for admin authority 
 solana-keygen new -o test_admin.json 
 # Export environment variable to use this keypair with SPL commands export 
-SOLANA_KEYPAIR=test_admin.json 
+export ADMIN_SOLANA_KEYPAIR=test_admin.json 
 # Generate a new Solana keypair for a test user 
 solana-keygen new -o test_user.json 
 # Export environment variable to use this keypair with SPL commands 
 export USER_SOLANA_KEYPAIR=test_user.json
+
+# Change the signer in the config for the admin solana config 
+solana config set -k $ADMIN_SOLANA_KEYPAIR
+# Check configuration
+solana config get
+# Check default address
+solana address --keypair $ADMIN_SOLANA_KEYPAIR
+solana address
+
+#Change url to local blockchain/validator
+solana config set --url http://127.0.0.1:8899
+
+#Aidrop SOL token to pay gas fees locally
+solana airdrop 1000 $USER_SOLANA_KEYPAIR
+solana airdrop 1000 $ADMIN_SOLANA_KEYPAIR
 ```
 
-- `test_admin.json` is the local file storing your keypair.
+- `test_admin.json` is the local file storing the token admin keypair.
+- `test_user.json` is the local file storing the test user (token holder) keypair.
 - `SOLANA_KEYPAIR` environment variable allows CLI tools (like `spl-token`) to reference it automatically.
 
 ------
@@ -200,40 +284,44 @@ export USER_SOLANA_KEYPAIR=test_user.json
 spl-token create-token \  --program-id TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb \  --decimals  <decimals>\  --mint-authority < Solana Keypair> \  --enable-permanent-delegate \  --enable-pause \  --enable-close \  --enable-metadata  --enable-freeze
 ```
 
- 
-
 **Note**
 
--  `TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb` is the programId of the Token Extensions program. See [Getting Started with Token Extensions](https://solana.com/tr/developers/guides/token-extensions/getting-started) 
+-  `TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb` is the programId of the Token Extensions program. See [Getting Started with Token Extensions](https://solana.com/en/developers/guides/token-extensions/getting-started) 
 - `decimals`: as part of CMTA specification, decimal numbers must be set to zero (which means that the tokens admit no fractional parts), unless the law governing the tokenized security allows the transfer of fractions.
 - You can decide to use a different keypair address for the `mint-authority`
-  - At deployment, the command-line does not allow you to set a different key for the other authorities (`freeze`, `pause`,
+  - At deployment, the command-line does not allow you to set a different key for the other authorities (`freeze`, `pause`, `delegate`)
 
 #### Example
 
 **Command**
 
-> spl-token create-token   --program-id TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb   --decimals  0  --mint-authority $SOLANA_KEYPAIR   --enable-permanent-delegate   --enable-pause   --enable-close   --enable-metadata --enable-freeze --url [http://127.0.0.1:8899](http://127.0.0.1:8899/)
+> spl-token create-token   --program-id TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb   --decimals  0  --mint-authority $ADMIN_SOLANA_KEYPAIR   --enable-permanent-delegate   --enable-pause   --enable-close   --enable-metadata --enable-freeze
 
 **Result**
 
-> Creating token B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp under program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
-> To initialize metadata inside the mint, please run `spl-token initialize-metadata B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp <YOUR_TOKEN_NAME> <YOUR_TOKEN_SYMBOL> <YOUR_TOKEN_URI>`, and sign with the mint authority.
+> Creating token JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2 under program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
+> To initialize metadata inside the mint, please run `spl-token initialize-metadata JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2 <YOUR_TOKEN_NAME> <YOUR_TOKEN_SYMBOL> <YOUR_TOKEN_URI>`, and sign with the mint authority.
 >
-> Address:  B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
+> Address:  JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
 > Decimals:  0
 
 Save the mint address as `TOKEN_MINT`.
 
+```bash
+export TOKEN_MINT=JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
 ```
-export TOKEN_MINT=B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
-```
+
+
+
+![file:///home/ryan/Pictures/dev/CMTAT_Solana/assets/2.token-create.png](file:///home/ryan/Pictures/dev/CMTAT_Solana/assets/2.token-create.png)
 
 
 
 ##### Verification
 
-**Command**
+```bash
+spl-token display [OPTIONS] <TOKEN_ADDRESS>
+```
 
 ```bash
 spl-token display $TOKEN_MINT
@@ -242,18 +330,18 @@ spl-token display $TOKEN_MINT
 **Result**
 
 > SPL Token Mint
->   Address: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
->   Program: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
->   Supply: 0
->   Decimals: 0
->   Mint authority: <Solana account pubkey>
->   Freeze authority: <Solana account pubkey>
+>      Address: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+>      Program: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
+>      Supply: 0
+>      Decimals: 0
+>      Mint authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>      Freeze authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
 > Extensions
->   Close authority: <Solana account pubkey>
->   Permanent delegate: <Solana account pubkey>
->   Metadata Pointer:
->     Authority: <Solana account pubkey>
->     Metadata address: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
+>      Close authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>      Permanent delegate: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>      Metadata Pointer:
+>        Authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>        Metadata address: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
 
 ------
 
@@ -281,10 +369,18 @@ spl-token initialize-metadata --url <url> \ --program-2022 --mint-authority <Sol
 #### Example
 
 ```bash
-spl-token initialize-metadata --url http://127.0.0.1:8899 --program-2022 \ --mint-authority $SOLANA_KEYPAIR --update-authority \ $SOLANA_KEYPAIR $TOKEN_MINT CMTATToken CMTAT https://cmta.ch/token.json
+spl-token initialize-metadata --program-2022 --mint-authority $ADMIN_SOLANA_KEYPAIR --update-authority $ADMIN_SOLANA_KEYPAIR $TOKEN_MINT CMTATToken CMTAT https://cmta.ch/token.json
 ```
 
  
+
+![3.initialize-metadata](./assets/3.initialize-metadata.png)
+
+
+
+![4. initialize-metadata](./assets/4. initialize-metadata.png)
+
+
 
 **Verification**
 
@@ -293,24 +389,24 @@ spl-token display $TOKEN_MINT
 ```
 
 > SPL Token Mint
->   Address: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
->   Program: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
->   Supply: 0
->   Decimals: 0
->   Mint authority: <Solana account pubkey>
->   Freeze authority: <Solana account pubkey>
+>      Address: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+>      Program: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
+>      Supply: 0
+>      Decimals: 0
+>      Mint authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>      Freeze authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
 > Extensions
->   Close authority: <Solana account pubkey>
->   Permanent delegate: <Solana account pubkey>
->   Metadata Pointer:
->     Authority: <Solana account pubkey>
->     Metadata address: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
->   Metadata:
->     Update Authority: <Solana account pubkey>
->     Mint: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
->     Name: CMTATToken
->     Symbol: CMTAT
->     URI: https://cmta.ch/token.json
+>      Close authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>      Permanent delegate: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>      Metadata Pointer:
+>        Authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>        Metadata address: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+>      Metadata:
+>        Update Authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>        Mint: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+>        Name: CMTATToken
+>        Symbol: CMTAT
+>        URI: https://cmta.ch/token.json
 
 ### Create Token Account
 
@@ -318,22 +414,36 @@ spl-token display $TOKEN_MINT
 spl-token create-account [OPTIONS] <TOKEN_MINT_ADDRESS> [ACCOUNT_KEYPAIR]
 ```
 
+**Options**
+
+ --program-2022
+            Use token extension program token 2022 with program id:
+            TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
+
+--owner <OWNER_ADDRESS>
+            Address of the primary authority controlling a mint or account. Defaults to the client
+            keypair address.
+
 #### Admin
 
 Create the token account for the admin
 
 ```bash
-spl-token create-account --program-id TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb \  $TOKEN_MINT
+spl-token create-account --program-2022 $TOKEN_MINT --owner $ADMIN_SOLANA_KEYPAIR
 ```
+
+
+
+![20create-token-account.png](./assets/5.create-token-account.png)
 
 **Result**
 
-> Creating account Hfq8KnY81kfKByAoTy52NyMgQVQJ2tYg8DWYeqnytN9N
+> Creating account ApXcDVWCXhPgfAmUYqQ85JcYmyxqecqDPKXPz8B2fjqK
 
 We export the token account created in an environment variable:
 
 ```bash
-export TOKEN_ACCOUNT=Hfq8KnY81kfKByAoTy52NyMgQVQJ2tYg8DWYeqnytN9N 
+export ADMIN_TOKEN_ACCOUNT=ApXcDVWCXhPgfAmUYqQ85JcYmyxqecqDPKXPz8B2fjqK
 ```
 
 #### User
@@ -341,18 +451,31 @@ export TOKEN_ACCOUNT=Hfq8KnY81kfKByAoTy52NyMgQVQJ2tYg8DWYeqnytN9N
 Create a user token account
 
 ```bash
-spl-token create-account --program-id TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb \ $TOKEN_MINT $USER_SOLANA_KEYPAIR
+# Change default key to USER
+solana config set -k $USER_SOLANA_KEYPAIR
+# Create account
+spl-token create-account --program-2022 $TOKEN_MINT --owner $USER_SOLANA_KEYPAIR
+#rollback change
+solana config set -k $ADMIN_SOLANA_KEYPAIR
 ```
+
+
 
 Result:
 
-> Creating account JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc
+> Creating account diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1
 
 We export the token account created in an environment variable:
 
 ```bash
-export USER_TOKEN_ACCOUNT=JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc
+export USER_TOKEN_ACCOUNT=diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1
 ```
+
+
+
+![create-token-account.png](./assets/6.create-token-account.png)
+
+
 
 ### Mint Initial Supply
 
@@ -360,21 +483,23 @@ export USER_TOKEN_ACCOUNT=JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc
 spl-token mint [OPTIONS] <TOKEN_MINT_ADDRESS> <TOKEN_AMOUNT> [--]  [RECIPIENT_TOKEN_ACCOUNT_ADDRESS]
 ```
 
- 
-
-#### Example
+ Example
 
 ##### Admin
 
 ```bash
-spl-token mint  --program-2022 --mint-authority \ $SOLANA_KEYPAIR $TOKEN_MINT 1000 $TOKEN_ACCOUNT
+spl-token mint  --program-2022 --mint-authority $ADMIN_SOLANA_KEYPAIR $TOKEN_MINT 1000 $ADMIN_TOKEN_ACCOUNT
 ```
 
 **Result**
 
 > Minting 1000 tokens
->   Token: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
->   Recipient: Hfq8KnY81kfKByAoTy52NyMgQVQJ2tYg8DWYeqnytN9N
+>   Token: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+>   Recipient: ApXcDVWCXhPgfAmUYqQ85JcYmyxqecqDPKXPz8B2fjqK
+
+![7. mint-token](./assets/7.mint-token.png)
+
+
 
 **Verification**
 
@@ -386,10 +511,16 @@ spl-token supply $TOKEN_MINT
 
 Result: `1000`
 
+![8.mint-token-supply](./assets/8.mint-token-supply.png)
+
 -  Check the token account balance
 
 ```bash
-spl-token balance [OPTIONS] [TOKEN_MINT_ADDRESS] spl-token balance --program-2022 --address $TOKEN_ACCOUNT
+spl-token balance [OPTIONS] [TOKEN_MINT_ADDRESS]
+```
+
+```bash
+spl-token balance --program-2022 --address $ADMIN_TOKEN_ACCOUNT
 ```
 
 Result: `1000`
@@ -397,14 +528,14 @@ Result: `1000`
 ##### User
 
 ```bash
-spl-token mint  --program-2022 --mint-authority $SOLANA_KEYPAIR \ $TOKEN_MINT 300  $USER_TOKEN_ACCOUNT
+spl-token mint --program-2022 --mint-authority $ADMIN_SOLANA_KEYPAIR $TOKEN_MINT 300 $USER_TOKEN_ACCOUNT
 ```
 
 **Result**
 
 > Minting 300 tokens
->   Token: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
->   Recipient: JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc
+>   Token: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+>   Recipient: diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1
 
 ```bash
 spl-token balance --program-2022 --address $USER_TOKEN_ACCOUNT
@@ -418,6 +549,10 @@ spl-token supply $TOKEN_MINT
 
 Result: 1300
 
+ ![9.mint-token.png](./assets/9.mint-token.png)
+
+
+
 ### Freeze / Unfreeze Accounts
 
 The Mint may also contain a `freeze_authority` which can be used to issue `FreezeAccount` instructions that will render an Account unusable. 
@@ -427,19 +562,32 @@ The Mint may also contain a `freeze_authority` which can be used to issue `Freez
 - If a Mint's `freeze_authority` is set to `None` then account freezing and thawing is permanently disabled and all currently frozen accounts will also stay frozen permanently.
 
 ```bash
-spl-token freeze [OPTIONS] <TOKEN_ACCOUNT_ADDRESS> spl-token thaw [OPTIONS] <TOKEN_ACCOUNT_ADDRESS>
+spl-token freeze [OPTIONS] <TOKEN_ACCOUNT_ADDRESS> 
+spl-token thaw [OPTIONS] <TOKEN_ACCOUNT_ADDRESS>
 ```
 
-**Example**
+##### Freeze
 
 ```bash
-spl-token freeze --freeze-authority $SOLANA_KEYPAIR $USER_TOKEN_ACCOUNT
+spl-token freeze --freeze-authority $ADMIN_SOLANA_KEYPAIR $USER_TOKEN_ACCOUNT
 ```
 
-> Freezing account: JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc
->   Token: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
+**Result**
 
-**Transfer**
+> Freezing account: diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1
+>   Token: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+
+- Instructions
+
+![11b-freeze-account](./assets/11b-freeze-account.png)
+
+- Account status
+
+We can see that the status is passed to `Frozen`.
+
+![11.freeze-account.png](./assets/11.freeze-account.png)
+
+##### Transfer
 
 ```bash
 spl-token transfer [OPTIONS] \ <TOKEN_MINT_ADDRESS> <TOKEN_AMOUNT> \ <RECIPIENT_WALLET_ADDRESS or RECIPIENT_TOKEN_ACCOUNT_ADDRESS>
@@ -447,39 +595,58 @@ spl-token transfer [OPTIONS] \ <TOKEN_MINT_ADDRESS> <TOKEN_AMOUNT> \ <RECIPIENT_
 
  **Example**
 
+We try to transfer tokens from our user account to the admin account
+
 ```bash
-spl-token transfer --from $USER_SOLANA_KEYPAIR $TOKEN_MINT 100 $TOKEN_ACCOUNT
+solana config set -k $USER_SOLANA_KEYPAIR
+spl-token transfer --program-2022 --from $USER_TOKEN_ACCOUNT $TOKEN_MINT 100 $ADMIN_TOKEN_ACCOUNT
 ```
 
 **Result**
 
 > Transfer 100 tokens
->   Sender: JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc
->   Recipient: Hfq8KnY81kfKByAoTy52NyMgQVQJ2tYg8DWYeqnytN9N
-> Error: Client(Error { request: Some(SendTransaction), kind: RpcError(RpcResponseError { code: -32002, message: "Transaction simulation failed: Error processing Instruction 0: custom program error: 0x11", data: SendTransactionPreflightFailure(RpcSimulateTransactionResult { err: Some(InstructionError(0, Custom(17))), logs: Some(["Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]", "Program log: Instruction: TransferChecked", "Program log: Error: Account is frozen", "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1111 of 1111 compute units", "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb failed: custom program error: 0x11"]), accounts: None, units_consumed: Some(1111), loaded_accounts_data_size: Some(684907), return_data: None, inner_instructions: None, replacement_blockhash: None }) }) })
+>      Sender: diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1
+>      Recipient: ApXcDVWCXhPgfAmUYqQ85JcYmyxqecqDPKXPz8B2fjqK
+> Error: Client(Error { request: Some(SendTransaction), kind: RpcError(RpcResponseError { code: -32002, message: "**Transaction simulation failed**: Error processing Instruction 0: custom program error: 0x11", data: SendTransactionPreflightFailure(RpcSimulateTransactionResult { err: Some(InstructionError(0, Custom(17))), logs: Some(["Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]", "Program log: Instruction: TransferChecked", "Program log: Error: **Account is frozen**", "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1111 of 1111 compute units", "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb failed: custom program error: 0x11"]), accounts: None, units_consumed: Some(1111), loaded_accounts_data_size: Some(684911), return_data: None, inner_instructions: None, replacement_blockhash: None }) }) })
+
+#### Unfreeze (thaw)
+
+```
+spl-token thaw [OPTIONS] <TOKEN_ACCOUNT_ADDRESS>
+```
 
 ```bash
-spl-token thaw --freeze-authority $SOLANA_KEYPAIR $USER_TOKEN_ACCOUNT
+solana config set -k $ADMIN_SOLANA_KEYPAIR
+spl-token thaw --freeze-authority $ADMIN_SOLANA_KEYPAIR $USER_TOKEN_ACCOUNT
 ```
 
 **Result**
 
-> Thawing account: JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc
->   Token: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
+> Thawing account: diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1
+>      Token: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+
+
+
+![thaw-account.png](./assets/12.thaw-account.png)
 
 Now we can perform our transfer:
 
 ```bash
-spl-token transfer --from $USER_SOLANA_KEYPAIR $TOKEN_MINT 100 $TOKEN_ACCOUNT
+solana config set -k $USER_SOLANA_KEYPAIR
+spl-token transfer --from $USER_TOKEN_ACCOUNT --owner $USER_SOLANA_KEYPAIR $TOKEN_MINT 100 $ADMIN_TOKEN_ACCOUNT
 ```
 
 **Result**
 
 > Transfer 100 tokens
->   Sender: JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc
->   Recipient: Hfq8KnY81kfKByAoTy52NyMgQVQJ2tYg8DWYeqnytN9N
+>     Sender: diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1
+>     Recipient: ApXcDVWCXhPgfAmUYqQ85JcYmyxqecqDPKXPz8B2fjqK
+
+![17.transfer-details](./assets/17.transfer-details.png)
 
 ### Burn Tokens / Forced Transfer (Permanent Delegate)
+
+The standard token version already allows a token holder to burn its own token
 
 With Token-2022, it's possible to specify a permanent account delegate for a mint. This authority has unlimited delegate privileges over any account for that mint, meaning that it can burn or transfer any amount of tokens.
 
@@ -487,18 +654,36 @@ With Token-2022, it's possible to specify a permanent account delegate for a min
 spl-token burn [OPTIONS] <TOKEN_ACCOUNT_ADDRESS> <TOKEN_AMOUNT>
 ```
 
-#### Burn
-
 ```bash
 spl-token burn $USER_TOKEN_ACCOUNT 5
 ```
 
-#####  Signer as admin
+> Burn 5 tokens
+>   Source: diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1
+
+![21.own-burn](./assets/21.own-burn.png)
+
+**Verification**
+
+```bash
+spl-token balance --program-2022 --address $USER_TOKEN_ACCOUNT
+```
+
+#### Burn as admin
+
+```bash
+solana config set -k $ADMIN_SOLANA_KEYPAIR
+spl-token burn $USER_TOKEN_ACCOUNT 5
+```
 
 **Result**
 
 > Burn 5 tokens
->   Source: JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc
+>     Source: diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1
+
+The signer of the transaction will be the admin
+
+![18.force-signer](./assets/18.force-signer.png)
 
 
 
@@ -508,17 +693,16 @@ If I try to burn admin tokens with my user as the signer, I will have the error 
 
 ```bash
 # Change the signer in the config for the user solana config 
-set -k $USER_SOLANA_KEYPAIR solana address 
-#result JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc 
+solana config set -k $USER_SOLANA_KEYPAIR
 # try to burn admin token with the user as signer 
-spl-token burn $TOKEN_ACCOUNT 5
+spl-token burn $ADMIN_TOKEN_ACCOUNT 5
 ```
 
 **Result**
 
 > Burn 5 tokens
->   Source: Hfq8KnY81kfKByAoTy52NyMgQVQJ2tYg8DWYeqnytN9N
-> Error: Client(Error { request: Some(SendTransaction), kind: RpcError(RpcResponseError { code: -32002, message: "Transaction simulation failed: This account may not be used to pay transaction fees", data: SendTransactionPreflightFailure(RpcSimulateTransactionResult { err: Some(**InvalidAccountForFee**), logs: Some([]), accounts: None, units_consumed: Some(0), loaded_accounts_data_size: Some(0), return_data: None, inner_instructions: None, replacement_blockhash: None }) }) })
+>     Source: ApXcDVWCXhPgfAmUYqQ85JcYmyxqecqDPKXPz8B2fjqK
+> Error: Client(Error { request: Some(SendTransaction), kind: RpcError(RpcResponseError { code: -32002, message: "Transaction simulation failed: Error processing Instruction 0: custom program error: 0x4", data: SendTransactionPreflightFailure(RpcSimulateTransactionResult { err: Some(InstructionError(0, Custom(4))), logs: Some(["Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]", "Program log: Instruction: BurnChecked", "Program log: **Error: owner does not match**", "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2013 of 2013 compute units", "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb failed: custom program error: 0x4"]), accounts: None, units_consumed: Some(2013), loaded_accounts_data_size: Some(684673), return_data: None, inner_instructions: None, replacement_blockhash: None }) }) })
 
  
 
@@ -533,25 +717,35 @@ spl-token transfer [OPTIONS] <TOKEN_MINT_ADDRESS> \ <TOKEN_AMOUNT> \ <RECIPIENT_
 **Example**
 
 ```bash
-# Change the signer in the config for the user solana config 
-set -k $SOLANA_KEYPAIR solana address #result JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc 
+# Change the signer in the config for the admin solana config 
+solana config set -k $ADMIN_SOLANA_KEYPAIR
 #  forced transfer tokens from user -> admin with the admin signer key 
-spl-token transfer --from $USER_SOLANA_KEYPAIR \ $TOKEN_MINT 10 $TOKEN_ACCOUNT
+spl-token transfer --program-2022 --from $USER_TOKEN_ACCOUNT $TOKEN_MINT 10 $ADMIN_TOKEN_ACCOUNT
 ```
 
  
 
 **Result**
 
-```
-Transfer 10 tokens  Sender: JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc  Recipient: Hfq8KnY81kfKByAoTy52NyMgQVQJ2tYg8DWYeqnytN9N
-```
+> Transfer 10 tokens
+>   Sender: diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1
+>   Recipient: ApXcDVWCXhPgfAmUYqQ85JcYmyxqecqDPKXPz8B2fjqK
+
+![19.force-transfer](./assets/19.force-transfer.png)
+
+![20.force-transfer](./assets/20.force-transfer.png)
+
+
 
 ### Pause / Resume All Activity
 
 By enabling the pausable extension on your mint, the program aborts all tranfers, mints, and burns when the `paused` flag is flipped.
 
+This also includes force operation by the admin such as `burn`and `transfer`
+
 ####  Pause
+
+Pause
 
 ```bash
 spl-token pause [OPTIONS] <TOKEN_MINT_ADDRESS>
@@ -560,19 +754,38 @@ spl-token pause $TOKEN_MINT
 
 **Result**
 
-Pausing mint, burn, and transfer for B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
+Pausing mint, burn, and transfer for JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
 
- 
+![token-pause](./assets/28.token-pause.png)
+
+
 
 Trying a transfer will generate *Program log: Transferring, minting, and burning is paused on this mint*
 
 ```bash
-spl-token transfer --from $USER_SOLANA_KEYPAIR $TOKEN_MINT 10 $USER_TOKEN_ACCOUNT 
+solana config set -k $ADMIN_SOLANA_KEYPAIR
+spl-token transfer $TOKEN_MINT 10 $USER_TOKEN_ACCOUNT 
 ```
 
-> Transfer 10 tokens  Sender: JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc  
-> Recipient: JCh4TLAagtW2vFQwVuUVi3nVipp8HJUcdpQHiauhE6Sc
-> Error: Client(Error { request: Some(SendTransaction), kind: RpcError(RpcResponseError { code: -32002, message: "Transaction simulation failed: Error processing Instruction 0: custom program error: 0x43", data: SendTransactionPreflightFailure(RpcSimulateTransactionResult { err: Some(InstructionError(0, Custom(67))), logs: Some(["Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]", "Program log: Instruction: TransferChecked", "Program log: Transferring, minting, and burning is paused on this mint", "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2059 of 2059 compute units", "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb failed: custom program error: 0x43"]), accounts: None, units_consumed: Some(2059), loaded_accounts_data_size: Some(684669), return_data: None, inner_instructions: None, replacement_blockhash: None }) }) })
+> Transfer 10 tokens
+>   Sender: ApXcDVWCXhPgfAmUYqQ85JcYmyxqecqDPKXPz8B2fjqK
+>   Recipient: diZa8NKEJ7wTf31meXA9X2pyQnBsTnV4jsYUmwfFAK1
+> Error: Client(Error { request: Some(SendTransaction), kind: RpcError(RpcResponseError { code: -32002, message: "Transaction simulation failed: Error processing Instruction 0: custom program error: 0x43", data: SendTransactionPreflightFailure(RpcSimulateTransactionResult { err: Some(InstructionError(0, Custom(67))), logs: Some(["Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]", "Program log: Instruction: TransferChecked", "**Program log: Transferring, minting, and burning is paused on this mint**", "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2192 of 2192 compute units", "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb failed: custom program error: 0x43"]), accounts: None, units_consumed: Some(2192), loaded_accounts_data_size: Some(684911), return_data: None, inner_instructions: None, replacement_blockhash: None }) }) })
+
+------
+
+#### Resume
+
+Resume mint, burn, and transfer
+
+```
+spl-token resume [OPTIONS] <TOKEN_MINT_ADDRESS>
+spl-token resume $TOKEN_MINT
+```
+
+ Resuming mint, burn, and transfer for JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+
+![29.token-resume](./assets/29.token-resume.png)
 
 ------
 
@@ -591,9 +804,10 @@ spl-token update-metadata <TOKEN_MINT_ADDRESS> <FIELD_NAME>
 spl-token update-metadata $TOKEN_MINT symbol "NEW" 
 spl-token update-metadata $TOKEN_MINT uri "https://cmta.ch/token_new.json"  
 # Add custom compliance fields 
-spl-token update-metadata $TOKEN_MINT TermsUri "https://cmta.ch/token_new.pdf spl-token update-metadata $TOKEN_MINT termsHash \ "0x9c22ff5f21f0b81b113e63f7db6da94fedef11b2119b4088b89664fb9a3cb658" 
+spl-token update-metadata $TOKEN_MINT TermsUri "https://cmta.ch/token_new.pdf" 
+spl-token update-metadata $TOKEN_MINT termsHash "0x9c22ff5f21f0b81b113e63f7db6da94fedef11b2119b4088b89664fb9a3cb658" 
 spl-token update-metadata $TOKEN_MINT jurisdiction "EU-MiCA" 
-spl-token update-metadata $TOKEN_MINT issuer "CMTA Ltd." 
+spl-token update-metadata $TOKEN_MINT issuer "CMTA" 
 ```
 
 **Result**
@@ -602,32 +816,33 @@ spl-token update-metadata $TOKEN_MINT issuer "CMTA Ltd."
 spl-token display $TOKEN_MINT
 ```
 
+> spl-token display $TOKEN_MINT
+
 > SPL Token Mint
->   Address: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
+>   Address: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
 >   Program: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
->   Supply: 1245
+>   Supply: 1270
 >   Decimals: 0
->   Mint authority: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
->   Freeze authority: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
+>   Mint authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>   Freeze authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
 > Extensions
->   Close authority: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
->   Permanent delegate: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
+>   Close authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>   Permanent delegate: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
 >   Metadata Pointer:
->     Authority: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
->     Metadata address: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
+>     Authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>     Metadata address: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
 >   Metadata:
->     Update Authority: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
->     Mint: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
->     Name: New CMTAT Token
+>     Update Authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>     Mint: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+>     Name: CMTATToken
 >     Symbol: NEW
 >     URI: https://cmta.ch/token_new.json
 >     TermsUri: https://cmta.ch/token_new.pdf
->
-> termsHash: 0x9c22ff5f21f0b81b113e63f7db6da94fedef11b2119b4088b89664fb9a3cb658
-> jurisdiction: EU-MiCA
-> issuer: CMTA Ltd.
+>     termsHash: 0x9c22ff5f21f0b81b113e63f7db6da94fedef11b2119b4088b89664fb9a3cb658
+>     jurisdiction: EU-MiCA
+>     issuer: CMTA
 
- 
+![29.update-metadata](./assets/29.update-metadata.png)
 
 #### Remove a custom field
 
@@ -642,34 +857,65 @@ spl-token display $TOKEN_MINT
 ```
 
 > SPL Token Mint
->   Address: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
+>   Address: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
 >   Program: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
->   Supply: 1245
+>   Supply: 1270
 >   Decimals: 0
->   Mint authority: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
->   Freeze authority: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
+>   Mint authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>   Freeze authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
 > Extensions
->   Close authority: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
->   Permanent delegate: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
+>   Close authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>   Permanent delegate: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
 >   Metadata Pointer:
->     Authority: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
->     Metadata address: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
+>     Authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>     Metadata address: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
 >   Metadata:
->     Update Authority: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
->     Mint: B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
->     Name: New CMTAT Token
+>     Update Authority: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>     Mint: JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+>     Name: CMTATToken
 >     Symbol: NEW
 >     URI: https://cmta.ch/token_new.json
 >     TermsUri: https://cmta.ch/token_new.pdf
->
->    jurisdiction: EU-MiCA
->     issuer: CMTA Ltd.
+>     jurisdiction: EU-MiCA
+>     issuer: CMTA
+
+
+
+![remove-metadata.png](./assets/30.remove-metadata.png)
 
 ### Deactivate token
 
 #### Burn all tokens
 
 Using the delegate authorities, burn all remaining tokens as seen above.
+
+```bash
+spl-token balance --address $USER_TOKEN_ACCOUNT
+```
+
+Result: 150
+
+```bash
+spl-token burn $USER_TOKEN_ACCOUNT 150
+```
+
+> Burn 150 tokens
+
+```
+spl-token balance --address $ADMIN_TOKEN_ACCOUNT
+```
+
+Result: 1120
+
+```bash
+spl-token burn $ADMIN_TOKEN_ACCOUNT 1120
+```
+
+```bash
+spl-token supply $TOKEN_MINT
+```
+
+Result: 0
 
 #### Deactivate Authorities
 
@@ -689,17 +935,17 @@ spl-token authorize $TOKEN_MINT pause --disable
 
 **Result**
 
-> Updating B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
->   Current mint: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
->   New mint: disabled
+> Updating JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+>     Current mint: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>     New mint: disabled
 >
->  Updating B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
->Current freeze: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
-> New freeze: disabled
+>  Updating JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+>  Current freeze: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>   New freeze: disabled
 >   
->   Updating B537Vzh62QUbC8zpCLfyRU9DrewYUcjsePC1omDj6qTp
->Current pause: Ao4rvCKFNGqUo5dd79J3Cf9MwG5PyW8nJRi5U6dHyppg
-> New pause: disabled
+>   Updating JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2
+>  Current pause: Annh1c8T1nLKqU1dNNm7xUho7H6hU9KV6JE9THndHEfj
+>   New pause: disabled
 
  
 
@@ -707,56 +953,22 @@ spl-token authorize $TOKEN_MINT pause --disable
 
 The Token program allows owners to close token accounts, but it is impossible to close mint accounts. In Token-2022, it is possible to close mints by initializing the `MintCloseAuthority` extension before initializing the mint.
 
-Admin must burn all tokens before closing the token mint
+The Admin must burn all tokens before closing the token mint
 
 ```bash
 spl-token close-mint $TOKEN_MINT
+
 ```
 
-------
+If you try to mint new tokens:
 
-## Main difference with EVM Solidity version
+```
+spl-token mint --program-2022 --mint-authority $ADMIN_SOLANA_KEYPAIR $TOKEN_MINT 300 $USER_TOKEN_ACCOUNT
+```
 
-**Forced transfer**
+This will generate the following error:
 
-- With Solana, there is no difference between a regular transfer and a forced transfer, while on Ethereum it is two distinct functions. Same applies to a force burn.
-- Forced transfer is an optional feature of CMTAT. While the EVM version allows to only include the force burn, with Solana, it is not possible to include the force burn without the force transfer.
-
-Note: It is possible to separate force burn from force transfer if the permanent delegate is itself a smart contract that would only allow for one of the two options. 
-
-**Access control**
-
-- With the Solidity version, you can have a super admin which delegates several tasks to different addresses through different roles, for example the minter role to mint tokens.
-- With Solana, you can also delegate roles, but it is not possible to delegate them while keeping a super admin.
-
-Note: Similar to forced transfer above, if the role authorities are themselves smart contracts you can create complex control structures with multisigs, admin accounts etc. In order to have a super admin, you can designate all roles to one smart contract which then has its own rules as to who has authority over which role.
-
-**Mint/burn while pause**
-
-- With Ethereum, you can still burn and mint tokens while pausing regular transfers.
-- This is not the case with Solana where the pause will also apply to mint and burn operations in addition to regular transfers.
-
-Note: In order to enable this, you can use a [transfer hook](https://www.solana-program.com/docs/token-2022/extensions#transfer-hook) that is set to a program that just fails every transfer. This way you retain all other administrative features but prevent anyone from transferring tokens.
-
-## Schema
-
-### Features
-
-![solana-cmtat-extension-list-color.drawio](./schema/solana-cmtat-extension-list-color.drawio.png)
-
-#### Base
-
-![solana-cmtat-basic.drawio](./schema/solana-cmtat-basic.drawio.png)
-
-#### Extensions
-
-![solana-cmtat-extension.drawio](./schema/solana-cmtat-extension.drawio.png)
-
-### Access Control
-
-Here is a schema representing the different authorities:
-
-![solana-cmtat.drawio](./schema/solana-cmtat.drawio.png) 
+> Error: "Account JA6iL96LYav6GaMS1NnrZRTYA98PjfyQyu9DBwxdb2b2 not found"
 
 ## Reference
 
