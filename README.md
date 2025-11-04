@@ -9,10 +9,6 @@ Tokens on Solana are digital assets that represent ownership over diverse catego
 
 Tokens on Solana are referred to as SPL ([Solana Program Library](https://github.com/solana-program)) Tokens.
 
-[TOC]
-
-
-
 ### Solana Token
 
 This program defines a common implementation for Fungible and Non Fungible tokens.
