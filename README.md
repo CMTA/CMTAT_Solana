@@ -2,29 +2,41 @@
 
 This document contains the guidelines to deploy a CMTAT compliant token on [Solana](https://solana.com).
 
-**CMTAT**
+[TOC]
+
+
+
+## Introduction
+
+### CMTAT
 
 - The CMTA Standard Token for Securities (CMTAT) is an open standard for smart contracts designed specifically for the tokenization of financial instruments such as equity, debt and structured products and other transferable securities. 
 - CMTAT is blockchain agnostic in that it defines a set of functionalities that a security token should implement. 
 
 CMTAT specifications are available on CMTA website: [cmta.ch/standards/cmta-token-cmtat](https://cmta.ch/standards/cmta-token-cmtat)
 
-**Solana**
+### Solana
 
 - Solana is a high-performance, Layer 1 blockchain optimized for finance and internet capital markets. 
+
 - Solana enables parallel execution and deterministic finality natively on its base layer, ensuring high throughput without sacrificing user experience or composability.
 
-See [What is Solana](https://solana.com/learn/what-is-solana), [Solana - tokenized equities](https://solana.com/tokenized-equities)
+- The **Solana Virtual Machine (SVM)** is the runtime environment responsible for executing Solana programs—stateless smart contracts stored on-chain as executable accounts. 
 
-[TOC]
+  Solana ships with a set of built-in programs that act as foundational components for most on-chain activity. These core programs fall into two categories: 
 
-## Solana introduction
+  - Native Programs, which provide low-level system and protocol functionality
+  - Solana Program Library (SPL) Programs, which offer higher-level, reusable standards such as token and associated account management.
+
+Reference: [Solana - What is Solana](https://solana.com/learn/what-is-solana), [Solana - tokenized equities](https://solana.com/tokenized-equities) and [Solana - EVM vs. SVM: Smart Contracts](https://solana.com/developers/evm-to-svm/smart-contracts)
+
+## Solana Token introduction
 
 Tokens on Solana are digital assets that represent ownership over diverse categories of assets. Tokenization enables the digitalization of property rights. 
 
 Tokens on Solana are referred to as SPL ([Solana Program Library](https://github.com/solana-program)) Tokens.
 
-### Solana Token
+### Solana Token Program
 
 This program defines a common implementation for Fungible and Non Fungible tokens.
 
@@ -83,6 +95,8 @@ Mint extensions currently include:
 - confidential transfers
 - confidential mint-burn
 
+> Confidential transfers and mint-burn will not be analyzed in this document. We could do that, however, in the near future.
+
 #### Account extensions
 
 Account extensions currently include:
@@ -109,7 +123,7 @@ In the below table, the CMTAT framework required features are mapped to Solana t
 | Transfer tokens                               | [Transfer  tokens](https://solana.com/docs/tokens/basics/transfer-tokens) | &#x2612;                                                     | ERC20 `transfer`                                             |
 | Create tokens (mint)                          | [Mint tokens](https://solana.com/docs/tokens/basics/mint-tokens) | &#x2612;                                                     | `Mint/batchMint`                                             |
 | Cancel tokens (force burn)                    | &#x2612;                                                     | [Permanent Delegate](https://www.solana-program.com/docs/token-2022/extensions#permanent-delegate) | `burn/batchBurn`                                             |
-| Pause tokens                                  | &#x2612;                                                     | [Pausable](https://www.solana-program.com/docs/token-2022/extensions#pausable) (*pause*) <br />(*Nb. During this time, it is normally not possible to 		transfer, mint or burn tokens.)* 		 		*To enable mint and burn during pause a transfer hook must be 		used. See here.* | Pause <br />(*Nb. With CMTAT Solidity it is still possible to burn and mint while transfers are paused.)* |
+| Pause tokens                                  | &#x2612;                                                     | [Pausable](https://www.solana-program.com/docs/token-2022/extensions#pausable) (*pause*) <br />(*Nb. During this time, it is normally not possible to 		transfer, mint or burn tokens.)* <br />*To enable mint and burn during pause a transfer hook must be 		used. See here.* | Pause <br />(*Nb. With CMTAT Solidity it is still possible to burn and mint while transfers are paused.)* |
 | Unpause tokens                                | &#x2612;                                                     | [Pausable](https://www.solana-program.com/docs/token-2022/extensions#pausable) (*resume*) | `unpause`                                                    |
 | Deactivate contract                           | &#x2612;                                                     | [Mint Close Authority](https://www.solana-program.com/docs/token-2022/extensions#mint-close-authority) 	<br />(Burn all tokens, close Mint Account, eventually revoke authorities) | `deactivateContract`                                         |
 | Freeze                                        | [Freeze  Account](https://solana.com/docs/tokens/basics/freeze-account) | &#x2612;                                                     | `setAddressFrozen` (previously `freeze`)                     |
@@ -130,10 +144,10 @@ In the below table, the CMTAT framework optional features are mapped to Solana t
 | force Transfer             | &#x2612;                                                     | [Permanent Delegate](https://www.solana-program.com/docs/token-2022/extensions#permanent-delegate) | `forcedTransfer`                               |
 | freeze partial token       | &#x2612;                                                     | &#x2612;                                                     | `freezePartialTokens`/`unfreezePartialTokens`  |
 | Whitelisting               | &#x2612;                                                     | [Default Account State](https://www.solana-program.com/docs/token-2022/extensions#default-account-state) | CMTAT Allowlist / CMTAT with rule whitelist    |
-| RuleEngine / transfer hook | &#x2612;                                                     | [Transfer Hook](https://www.solana-program.com/docs/token-2022/extensions#transfer-hook)<br /> (not compatible with Confidential Transfer) | CMTAT with RuleEngine                          |
+| RuleEngine / transfer hook | &#x2612;                                                     | [Transfer Hook](https://www.solana-program.com/docs/token-2022/extensions#transfer-hook) | CMTAT with RuleEngine                          |
 | On-chain snapshot          | &#x2612;                                                     | &#x2612;                                                     | SnapshotEngine or dedicated deployment version |
 | Upgradibility              | N/A                                                          | N/A                                                          | CMTAT Upgradeable version                      |
-| Feepayer/gasless           | N/A<br />See [Sponsoring Solana transactions - Coinbase Developer Documentation](https://docs.cdp.coinbase.com/server-wallets/v2/solana-features/sponsor-transactions) <br />It is managed at the transaction level, no link with the token. | N/A                                                          | CMTAT with ERC-2771 module                     |
+| Feepayer/gasless           | N/A<br />Fee sponsorship is a native feature in Solana. See [Solana - Fee Sponsorship](https://solana.com/tr/developers/cookbook/transactions/fee-sponsorship) | N/A                                                          | CMTAT with ERC-2771 module                     |
 
 
 
@@ -141,20 +155,20 @@ In the below table, the CMTAT framework optional features are mapped to Solana t
 
 In the below table, the Solana token basic features are mapped to the CMTAT framework.
 
-| Solana  Token features                                       | Description                                                  | Solana CMTAT Required | CMTAT Required | CMTAT optional | CMTAT corresponding features          | Note                                                 |
-| :----------------------------------------------------------- | :----------------------------------------------------------- | :-------------------- | :------------- | :------------- | :------------------------------------ | :--------------------------------------------------- |
-| [Create a Token Mint](https://solana.com/docs/tokens/basics/create-mint) | A mint account uniquely represents a token on Solana and stores its global metadata. | &#x2611;              | N/A            | N/A            | N/A                                   | Correspond to deploy the smart contract on EVM chain |
-| [Create a Token Account](https://solana.com/docs/tokens/basics/create-token-account) | A token account stores your balance of a specific token.     | &#x2611;              | N/A            | N/A            | N/A                                   | No relevant for EVM based blockchain                 |
-| [Mint Tokens](https://solana.com/docs/tokens/basics/mint-tokens) | Minting creates new units of a token using the `MintTo` instruction. | &#x2611;              | &#x2611;       | &#x2612;       | mint/batchMint                        |                                                      |
-| [Transfer Tokens](https://solana.com/docs/tokens/basics/transfer-tokens) | Token transfers move tokens between token accounts of the same mint. | &#x2611;              | &#x2611;       | &#x2612;       | ERC20 transfer                        |                                                      |
-| [Approve Delegate](https://solana.com/docs/tokens/basics/approve-delegate) | The `ApproveChecked` instruction grants another account (the delegate) permission to transfer a specific amount of tokens from your token account. | &#x2611;              | &#x2611;       | &#x2612;       | ERC-20 approve                        |                                                      |
-| [Revoke Delegate](https://solana.com/docs/tokens/basics/revoke-delegate) | The `Revoke` instruction removes all transfer permissions from the currently approved delegate. | &#x2611;              | &#x2611;       | &#x2612;       | ERC-20 approve                        |                                                      |
-| [Set Authority](https://solana.com/docs/tokens/basics/set-authority) | The `SetAuthority` instruction changes or revokes authorities on mints and token accounts. | &#x2611;              | &#x2611;       | &#x2612;       | `RBAC system` `grantRole`             |                                                      |
-| [Burn Tokens](https://solana.com/docs/tokens/basics/burn-tokens) | The `BurnChecked` instruction permanently destroys tokens by reducing the balance in a token account. | &#x2611;              | &#x2612;       | &#x2611;       | `burnFrom`                            |                                                      |
-| [Sync Native](https://solana.com/docs/tokens/basics/sync-native) | The `SyncNative` instruction synchronizes a wrapped SOL (WSOL) token account balance with the actual SOL (lamports) stored in it. | &#x2612;              | &#x2612;       | &#x2612;       | &#x2612;                              |                                                      |
-| [Close Token Account](https://solana.com/docs/tokens/basics/close-account) | The `CloseAccount` instruction permanently closes a token account and transfers all remaining SOL (rent) to a specified destination account. | &#x2611;              | &#x2612;       | &#x2612;       | &#x2612;                              | Solana specific features (but relevant to implement) |
-| [Freeze Account](https://solana.com/docs/tokens/basics/freeze-account) | The `FreezeAccount` instruction prevents all token transfers or token burns from a specific token account. | &#x2611;              | &#x2611;       | &#x2612;       | `setAddressFrozen`(prev. `freeze` )   |                                                      |
-| [Thaw Account](https://solana.com/docs/tokens/basics/thaw-account) | The `ThawAccount` instruction reverses a freeze, restoring full functionality to a previously frozen token account. | &#x2611;              | &#x2611;       | &#x2612;       | `setAddressFrozen`(prev. `unfreeze` ) |                                                      |
+| Solana  Token features                                       | Description                                                  | Solana CMTAT Required | CMTAT Required | CMTAT optional | CMTAT corresponding features          | Note                                                         |
+| :----------------------------------------------------------- | :----------------------------------------------------------- | :-------------------- | :------------- | :------------- | :------------------------------------ | :----------------------------------------------------------- |
+| [Create a Token Mint](https://solana.com/docs/tokens/basics/create-mint) | A mint account uniquely represents a token on Solana and stores its global metadata. | &#x2611;              | N/A            | N/A            | N/A                                   | Correspond to deploy the smart contract on EVM chain         |
+| [Create a Token Account](https://solana.com/docs/tokens/basics/create-token-account) | A token account stores your balance of a specific token.     | &#x2611;              | N/A            | N/A            | N/A                                   | No relevant for EVM based blockchain                         |
+| [Mint Tokens](https://solana.com/docs/tokens/basics/mint-tokens) | Minting creates new units of a token using the `MintTo` instruction. | &#x2611;              | &#x2611;       | &#x2612;       | mint/batchMint                        |                                                              |
+| [Transfer Tokens](https://solana.com/docs/tokens/basics/transfer-tokens) | Token transfers move tokens between token accounts of the same mint. | &#x2611;              | &#x2611;       | &#x2612;       | ERC20 transfer                        |                                                              |
+| [Approve Delegate](https://solana.com/docs/tokens/basics/approve-delegate) | The `ApproveChecked` instruction grants another account (the delegate) permission to transfer a specific amount of tokens from your token account. | &#x2611;              | &#x2611;       | &#x2612;       | ERC-20 approve                        | Contrary to Ethereum (EVM),  this is often not needed in Solana since you can do actual DVP in one transaction due to native instruction batching. See [solana.com - transactions](https://solana.com/docs/core/transactions) |
+| [Revoke Delegate](https://solana.com/docs/tokens/basics/revoke-delegate) | The `Revoke` instruction removes all transfer permissions from the currently approved delegate. | &#x2611;              | &#x2611;       | &#x2612;       | ERC-20 approve                        |                                                              |
+| [Set Authority](https://solana.com/docs/tokens/basics/set-authority) | The `SetAuthority` instruction changes or revokes authorities on mints and token accounts. | &#x2611;              | &#x2611;       | &#x2612;       | `RBAC system` `grantRole`             |                                                              |
+| [Burn Tokens](https://solana.com/docs/tokens/basics/burn-tokens) | The `BurnChecked` instruction permanently destroys tokens by reducing the balance in a token account. | &#x2611;              | &#x2612;       | &#x2611;       | `burnFrom`                            |                                                              |
+| [Sync Native](https://solana.com/docs/tokens/basics/sync-native) | The `SyncNative` instruction synchronizes a wrapped SOL (WSOL) token account balance with the actual SOL (lamports) stored in it. | &#x2612;              | &#x2612;       | &#x2612;       | &#x2612;                              |                                                              |
+| [Close Token Account](https://solana.com/docs/tokens/basics/close-account) | The `CloseAccount` instruction permanently closes a token account and transfers all remaining SOL (rent) to a specified destination account. | &#x2611;              | &#x2612;       | &#x2612;       | &#x2612;                              | Solana specific features (but relevant to implement)         |
+| [Freeze Account](https://solana.com/docs/tokens/basics/freeze-account) | The `FreezeAccount` instruction prevents all token transfers or token burns from a specific token account. | &#x2611;              | &#x2611;       | &#x2612;       | `setAddressFrozen`(prev. `freeze` )   |                                                              |
+| [Thaw Account](https://solana.com/docs/tokens/basics/thaw-account) | The `ThawAccount` instruction reverses a freeze, restoring full functionality to a previously frozen token account. | &#x2611;              | &#x2611;       | &#x2612;       | `setAddressFrozen`(prev. `unfreeze` ) |                                                              |
 
 #### Solana extensions -> CMTAT
 
@@ -207,31 +221,66 @@ Here is a schema representing the different authorities:
 
 ## Main difference with EVM Solidity version
 
-The CMTAT version for Ethereum and EVM-compatible blockchains is also available on GitHub [CMTA/CMTAT](https://github.com/CMTA/CMTAT).
+This section compares the features and behavior of the CMTAT specification on Solana (the present document) with the CMTAT implementation for Ethereum and other EVM-compatible blockchains written in Solidity. The latter is also available on GitHub: [CMTA/CMTAT](https://github.com/CMTA/CMTAT).
 
-**burn / transfer**
+The Ethereum Virtual Machine (EVM) is the decentralized computation environment that executes smart-contract code on Ethereum and other EVM-compatible blockchains. More information can be found on [Ethereum.org](https://ethereum.org/developers/docs/evm/).
 
-- With Solana, there is no difference between a regular transfer and a forced transfer, while on Ethereum it is two distinct functions. Same applies to a force burn.
+Here is a summary tab of the main difference:
+
+| Id   | Functionalities                              | **CMTAT Solidity** | CMTAT Solana specification |
+| ---- | -------------------------------------------- | ------------------ | -------------------------- |
+| 1    | Mint while pause                             | ☑                  | ☒                          |
+| 2    | Burn while pause                             | ☑                  | ☒                          |
+| 3    | Self Burn                                    | ☒                  | ☑                          |
+| 4    | Standard burn on a frozen address            | ☒                  | ☒                          |
+| 5    | Forced burn tokens with a dedicated function | ☑                  | ☒                          |
+| 6    | Flexible metadata architecture               | ☒                  | ☑                          |
+
+**Note**: 1,2,3 and 4 can be also achieved on Solana through custom [transfer hooks](https://solana.com/developers/guides/token-extensions/transfer-hook).
+
+### Access control
+
+- With the Solidity version, you can have a super admin which delegates several tasks to different addresses through different roles, for example the minter role to mint tokens.
+- On Solana, you can also delegate roles, but it is not possible to delegate them while keeping a super admin.
+
+Note: Similar to forced transfer above, if the role authorities are themselves smart contracts you can create complex control structures with multisigs, admin accounts etc. In order to have a super admin, you can designate all roles to one smart contract which then has its own rules as to who has authority over which role.
+
+### ERC-20: `approve`
+
+As on the EVM, Solana tokens also support delegated spending authority through the `Approve` and `Revoke Delegate` instructions.
+
+However, unlike the EVM, this mechanism is often unnecessary on Solana because native instruction batching enables true Delivery-versus-Payment (DvP) to occur in a *single transaction*.
+
+This is a significant usability and security advantage: the EVM’s approval model is frequently seen as unfriendly to users and exposes them to risks, especially when decentralized applications request broad or unlimited approvals through their front-ends.
+
+See [solana.com - transactions](https://solana.com/docs/core/transactions)
+
+### Burn / Transfer
+
+- On Solana, there is no difference between a regular transfer and a forced transfer, while on EVM it is two distinct functions. Same applies to a force burn.
   - Nevertheless, the signer of the transaction will be different if it is a forced transfer (delegate authority) or a regular transfer (token holder signer).
-- Forced transfer is an optional feature of CMTAT. While the EVM version allows to only include the force burn, with Solana, it is not possible to include the force burn without the force transfer.
+- Forced transfer is an optional feature of CMTAT. While the Solidity version allows to only include the force burn, on Solana, it is not possible to include the force burn without the force transfer.
   - It is possible to separate force burn from force transfer if the permanent delegate is itself a smart contract that would only allow for one of the two options. 
 
 
 - Contrary to the Solidity version, token holder can burn by default their own tokens.
 
-**Access control**
+### Mint/Burn while pause
 
-- With the Solidity version, you can have a super admin which delegates several tasks to different addresses through different roles, for example the minter role to mint tokens.
-- With Solana, you can also delegate roles, but it is not possible to delegate them while keeping a super admin.
-
-Note: Similar to forced transfer above, if the role authorities are themselves smart contracts you can create complex control structures with multisigs, admin accounts etc. In order to have a super admin, you can designate all roles to one smart contract which then has its own rules as to who has authority over which role.
-
-**Mint/burn while pause**
-
-- With Ethereum, you can still burn and mint tokens while pausing regular transfers.
-- This is not the case with Solana where the pause will also apply to mint and burn operations in addition to regular transfers.
+- With Solidity, you can still burn and mint tokens while pausing regular transfers.
+- This is not the case on Solana where the pause will also apply to mint and burn operations in addition to regular transfers.
 
 Note: In order to enable this, you can use a [transfer hook](https://www.solana-program.com/docs/token-2022/extensions#transfer-hook) that is set to a program that just fails every transfer. This way you retain all other administrative features but prevent anyone from transferring tokens.
+
+### Enforcement (Freeze)
+
+- With Solidity, it is not possible to burn tokens on a frozen address through regular burn. The issuer must use `forcedBurn` or `forcedTransfer` to do it.
+- On Solana, it is also not possible to burn tokens held in a frozen account. However, unlike in Solidity, the issuer cannot perform a forced transfer while the account remains frozen—even when acting through a delegate authority. Instead, Solana’s ability to batch multiple instructions in a single transaction provides a practical workaround: the issuer can thaw (unfreeze) the account and then transfer the tokens via the delegate authority within the same transaction.
+
+### On-chain Metadata
+
+- In Solidity, each on-chain metadata attribute—such as `tokenId` or `terms`—must be explicitly defined in the smart contract before deployment, including the functions used to set and retrieve those values. Once deployed, the structure of these attributes is fixed.
+- On Solana, metadata management is more flexible. Attributes can be added or defined after deployment using the Solana Token Extensions [Metadata](https://solana.com/docs/tokens/extensions/metadata) feature, allowing issuers to evolve or enrich token metadata without modifying the original program.
 
 ## CMTAT Deployment Guide (Token-2022)
 
@@ -1012,7 +1061,7 @@ This will generate the following error:
 
 CMTAT Solidity version allows to restrict transactions to a predefined list of approved wallet addresses, known as a **whitelist/allowlist**. This is done through a specific deployment version (`CMTAT Allowlist`) or through the RuleEngine (e.g. `RuleWhitelist`) .
 
-With Solana, this is done by enabling the extension `Default Account State` at the creation of the token.
+On Solana, this is done by enabling the extension `Default Account State` at the creation of the token.
 
 ### Command line
 
@@ -1149,5 +1198,3 @@ We can see in the explorer that the status of the new created account is `initia
 - [Solana Program - Extension Guide](https://www.solana-program.com/docs/token-2022/extensions#permanent-delegate) 
 
 - [Solana - Issuing Tokenized Equities on Solana Report](https://solana.com/tokenized-equities)
-
-  
